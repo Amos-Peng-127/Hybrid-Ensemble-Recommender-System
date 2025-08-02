@@ -423,7 +423,7 @@ def get_ncf_predictions(
         model = NCF(num_users=len(user2idx), num_items=len(item2idx), embedding_dim=embedding_dim)
         
         # Load the pre-trained weights into the model
-        model.load_state_dict(torch.load(model_path, map_location=torch.device("cpu")))
+        model.load_state_dict(torch.load(model_path, map_location=torch.device("cpu"), weights_only=False))
         
         # Set the model to evaluation mode. This is crucial as it disables layers
         # like Dropout or BatchNorm, ensuring deterministic output for predictions.

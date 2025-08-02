@@ -3,7 +3,7 @@ st.set_page_config(page_title="Amazon Recommender", page_icon="📚")
 
 def main():
     st.title("My Streamlit App")
-
+    
     import os, sys, pickle, warnings
     import pandas as pd
     import numpy as np
@@ -53,19 +53,32 @@ def main():
         if not os.path.exists(TARGET_DIR):
             os.makedirs(TARGET_DIR)
 
+        import time
         downloaded_files = []
         for filename, url in FILES.items():
             path = os.path.join(TARGET_DIR, filename)
             if not os.path.exists(path):
-                st.write(f"⬇️ Downloading {filename} ...")
+                msg = st.empty()
+                msg.success(f"⬇️ Downloading {filename} ...")
+                time.sleep(3)  # Display for 3 seconds
+                msg.empty()
+
                 gdown.download(url, path, quiet=False)
                 downloaded_files.append(filename)
 
         if downloaded_files:
-            st.success(f"Downloaded files: {', '.join(downloaded_files)}")
+            msg = st.empty()
+            msg.success(f"Downloaded files: {', '.join(downloaded_files)}")
+
+            time.sleep(3)  # Display for 3 seconds
+            msg.empty()
         else:
-            st.info("✅ All files already exist. No download needed.")
-        
+            msg = st.empty()
+            msg.success("✅ All files already exist. No download needed.")
+
+            time.sleep(3)  # Display for 3 seconds
+            msg.empty()
+
         return TARGET_DIR
 
     download_dir = ensure_all_files()
@@ -108,7 +121,7 @@ def main():
         try:
             
             # --- SVD Predictions ---
-            svd_recommended_items_df = get_svd_predictions_for_user_history(user_id, df, df, svd_model_path)
+            svd_recommended_items_df = get_svd_predictions_for_user_history(user_id, df, df, svd_model_path, n=10)
 
             # --- Sentiment Analysis ---
             sentiment_df = calculate_sentiment_for_items(df, svd_recommended_items_df)
@@ -154,11 +167,35 @@ def main():
             
             if True:
                 
-                user_recs['Hybrid'] = 0.3 * user_recs['XGBoost'] + 0.25 * user_recs['NCF'] + 0.15 * user_recs['BERT'] + 0.15 * user_recs['SVD'] + 0.15 * user_recs ['Sentiment']
+                def scale_to_0_5(series):
+                    # z-score
+                    mean_val, std_val = series.mean(), series.std()
+                    if std_val == 0:
+                        standardized = series - mean_val
+                    else:
+                        standardized = (series - mean_val) / std_val
+                    
+                    # scale 0-5
+                    if standardized.max() > standardized.min():
+                        return 5 * (standardized - standardized.min()) / (standardized.max() - standardized.min())
+                    else:
+                        return 2.5
+                    
+                user_recs['XGBoost_scaled'] = scale_to_0_5(user_recs['XGBoost'])
+                user_recs['NCF_scaled'] = scale_to_0_5(user_recs['NCF'])
+                user_recs['BERT_scaled'] = scale_to_0_5(user_recs['BERT'])
+                user_recs['SVD_scaled'] = scale_to_0_5(user_recs['SVD'])
+                user_recs['Sentiment_scaled'] = scale_to_0_5(user_recs['Sentiment'])
 
-                # --- Scale Hybrid Scores to 0-5 Range ---
-                user_recs['Hybrid'] = 5 * (user_recs['Hybrid'] - user_recs['Hybrid'].min()) / (user_recs['Hybrid'].max() - user_recs['Hybrid'].min())
-                user_recs['Hybrid_scaled'] = 5 / (1 + np.exp(-10 * (user_recs['Hybrid'] - 0.5)))
+                user_recs['Hybrid'] = (
+                    0.3 * user_recs['XGBoost_scaled'] +
+                    0.25 * user_recs['NCF_scaled'] +
+                    0.15 * user_recs['BERT_scaled'] +
+                    0.15 * user_recs['SVD_scaled'] +
+                    0.15 * user_recs['Sentiment_scaled']
+                )
+
+                user_recs['Hybrid'] = user_recs['Hybrid']
                 
                 # --- Filter Recommendations by Minimum Rating ---
                 if model_choice in user_recs.columns:
