@@ -108,7 +108,7 @@ def main():
         try:
             
             # --- SVD Predictions ---
-            svd_recommended_items_df = get_svd_predictions_for_user_history(df, user_id, svd_model_path)
+            svd_recommended_items_df = get_svd_predictions_for_user_history(user_id, df, df, svd_model_path)
 
             # --- Sentiment Analysis ---
             sentiment_df = calculate_sentiment_for_items(df, svd_recommended_items_df)

@@ -76,40 +76,81 @@ def load_reviews_df(path):
 # --------------------------------------
 # Section 4: Core Analysis Functions
 # --------------------------------------
-def get_svd_predictions_for_user_history(user_history_df, user_id, model_path):
+# def get_svd_predictions_for_user_history(user_history_df, user_id, model_path):
+#     """
+#     Loads a pre-trained SVD model to predict ratings for items a user has
+#     already interacted with and returns the top 5 predictions.
+
+#     Args:
+#         user_history_df (pd.DataFrame): DataFrame with 'user_id' and 'item_id' columns.
+#         user_id (str): The ID of the user for whom to generate predictions.
+#         model_path (str): The file path to the trained SVD model (.pkl).
+
+#     Returns:
+#         pd.DataFrame: A 5-row DataFrame with 'user_id', 'item_id', and 'svd_prediction',
+#                       sorted by the predicted rating.
+#     """
+#     print(f"Loading SVD model from {model_path}...")
+#     with open(model_path, 'rb') as file:
+#         svd_model = pickle.load(file)
+
+#     # Filter the DataFrame for the specified user's interaction history
+#     target_user_df = user_history_df[user_history_df['user_id'] == user_id].copy()
+
+#     print(f"Generating SVD predictions for user: {user_id}...")
+#     # Use the model to predict ratings for each item in the user's history
+#     # The 'est' attribute of the prediction object holds the estimated rating.
+#     target_user_df['svd_rating'] = target_user_df.apply(
+#         lambda row: svd_model.predict(uid=row['user_id'], iid=row['item_id']).est,
+#         axis=1
+#     )
+    
+#     # Sort results and return the top 5
+#     top_predictions_df = target_user_df.sort_values(by='svd_rating', ascending=False).head()
+    
+#     return top_predictions_df[['user_id', 'item_id', 'svd_rating']]
+
+def get_svd_predictions_for_user_history(user_id, all_items_df, user_history_df, model_path, n=5):
     """
-    Loads a pre-trained SVD model to predict ratings for items a user has
-    already interacted with and returns the top 5 predictions.
+    Recommend Top-N items for a given user using a pre-trained SVD model.
 
     Args:
-        user_history_df (pd.DataFrame): DataFrame with 'user_id' and 'item_id' columns.
-        user_id (str): The ID of the user for whom to generate predictions.
-        model_path (str): The file path to the trained SVD model (.pkl).
+        user_id (str or int): The target user ID.
+        all_items_df (pd.DataFrame): DataFrame containing all available items.
+                                     Must include an 'item_id' column.
+        user_history_df (pd.DataFrame): DataFrame containing user interactions.
+                                        Must include 'user_id' and 'item_id' columns.
+        model_path (str): Path to the pre-trained SVD model (.pkl file).
+        n (int): Number of items to recommend (default = 5).
 
     Returns:
-        pd.DataFrame: A 5-row DataFrame with 'user_id', 'item_id', and 'svd_prediction',
-                      sorted by the predicted rating.
+        pd.DataFrame: A DataFrame with columns ['user_id', 'item_id', 'svd_rating']
+                      representing the top-N recommendations.
     """
-    print(f"Loading SVD model from {model_path}...")
-    with open(model_path, 'rb') as file:
-        svd_model = pickle.load(file)
+    # 1 Load the trained SVD model
+    with open(model_path, 'rb') as f:
+        svd_model = pickle.load(f)
 
-    # Filter the DataFrame for the specified user's interaction history
-    target_user_df = user_history_df[user_history_df['user_id'] == user_id].copy()
+    # 2️ Get items the user has already interacted with
+    user_items = set(user_history_df[user_history_df['user_id'] == user_id]['item_id'])
 
-    print(f"Generating SVD predictions for user: {user_id}...")
-    # Use the model to predict ratings for each item in the user's history
-    # The 'est' attribute of the prediction object holds the estimated rating.
-    target_user_df['svd_rating'] = target_user_df.apply(
-        lambda row: svd_model.predict(uid=row['user_id'], iid=row['item_id']).est,
-        axis=1
-    )
-    
-    # Sort results and return the top 5
-    top_predictions_df = target_user_df.sort_values(by='svd_rating', ascending=False).head()
-    
-    return top_predictions_df[['user_id', 'item_id', 'svd_rating']]
+    # 3️ Determine candidate items (all items minus items already interacted with)
+    candidate_items = set(all_items_df['item_id']) - user_items
 
+    if not candidate_items:
+        return pd.DataFrame(columns=['user_id', 'item_id', 'svd_rating'])
+
+    # 4️ Predict ratings for each candidate item
+    predictions = []
+    for item in candidate_items:
+        est_rating = svd_model.predict(uid=user_id, iid=item).est
+        predictions.append((user_id, item, est_rating))
+
+    # 5️ Convert predictions to DataFrame and select Top-N highest scores
+    pred_df = pd.DataFrame(predictions, columns=['user_id', 'item_id', 'svd_rating'])
+    top_n_df = pred_df.sort_values(by='svd_rating', ascending=False).head(n)
+
+    return top_n_df
 
 def calculate_sentiment_for_items(reviews_df, recommended_items_df):
     """
