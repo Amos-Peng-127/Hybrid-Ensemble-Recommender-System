@@ -8,7 +8,7 @@ sdk_version: 1.33.0
 app_file: app.py
 pinned: false
 license: mit
-short_description: A hybrid recommender system using SVD, BERT, sentiment analysis, XGBoost, NCF.
+short_description: Hybrid recommender system using SVD, BERT, sentiment analysis, XGBoost, NCF.
 ---
 
 # 📚 Hybrid Ensemble Recommender System
