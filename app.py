@@ -58,10 +58,10 @@ def main():
         for filename, url in FILES.items():
             path = os.path.join(TARGET_DIR, filename)
             if not os.path.exists(path):
-                msg = st.empty()
-                msg.success(f"⬇️ Downloading {filename} ...")
-                time.sleep(3)  # Display for 3 seconds
-                msg.empty()
+                # msg = st.empty()
+                # msg.success(f"⬇️ Downloading {filename} ...")
+                # time.sleep(3)  # Display for 3 seconds
+                # msg.empty()
 
                 gdown.download(url, path, quiet=False)
                 downloaded_files.append(filename)
