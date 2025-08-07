@@ -67,17 +67,19 @@ def main():
                 downloaded_files.append(filename)
 
         if downloaded_files:
-            msg = st.empty()
-            msg.success(f"Downloaded files: {', '.join(downloaded_files)}")
+            # msg = st.empty()
+            # msg.success(f"Downloaded files: {', '.join(downloaded_files)}")
 
-            time.sleep(3)  # Display for 3 seconds
-            msg.empty()
+            # time.sleep(3)  # Display for 3 seconds
+            # msg.empty()
+            pass
         else:
-            msg = st.empty()
-            msg.success("✅ All files already exist. No download needed.")
+            # msg = st.empty()
+            # msg.success("✅ All files already exist. No download needed.")
 
-            time.sleep(3)  # Display for 3 seconds
-            msg.empty()
+            # time.sleep(3)  # Display for 3 seconds
+            # msg.empty()
+            pass
 
         return TARGET_DIR
 
