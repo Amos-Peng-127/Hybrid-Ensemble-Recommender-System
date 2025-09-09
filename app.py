@@ -166,7 +166,7 @@ def main():
                     "ncf_score": "NCF",
                 }
             )
-            
+            st.write(ncf_predictions_df.head())
             if True:
                 
                 def scale_to_0_5(series):
