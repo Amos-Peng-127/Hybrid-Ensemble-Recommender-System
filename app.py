@@ -9,6 +9,7 @@ def main():
     import numpy as np
     import matplotlib.pyplot as plt
     import gdown
+    import ast
 
     import sys, os
     import pathlib
@@ -31,7 +32,7 @@ def main():
     sys.path.append(BASE_DIR)
     warnings.filterwarnings("ignore", category=UserWarning, module="xgboost")
 
-    st.title("📚 Amazon Product Recommender")
+    st.markdown("<h1 style='font-size: 40px;'>📚 Amazon Product Recommender</h1>", unsafe_allow_html=True)
     st.markdown("Choose a user or product to get recommendations. This app uses the final hybrid model outputs.")
 
     # ---------------------- #
@@ -45,6 +46,7 @@ def main():
         "trained_svd_model.pkl": "https://drive.google.com/uc?id=1qoL7nBaIQqTimBZStVld8rCr0oekqd9m",
         "user_item_mappings.pkl": "https://drive.google.com/uc?id=1WipR3wt_XIwsydaSHvlGyEt_rHlglyak",
         "xgboost_model.pkl": "https://drive.google.com/uc?id=1XI-yQ-wu8CSgZhQM91GgH3Ny3XdP0Ixz",
+        "Metadata.csv": "https://drive.google.com/uc?id=1Gghd2ZkyU2HZXzOMZjpvkiieHMaFwI-q"
     }
     TARGET_DIR = "resources"
 
@@ -96,9 +98,18 @@ def main():
     bert_vectors = np.load(os.path.join(download_dir, "bert_embeddings.npy"))
     bert_asins = pd.read_csv(os.path.join(download_dir, "bert_asins.csv"))["asin"].tolist()
     bert_item_id_to_idx = {asin: i for i, asin in enumerate(bert_asins)}
+    metadata_df = pd.read_csv(os.path.join(download_dir, "Metadata.csv"), low_memory=False)
 
     with open(os.path.join(download_dir, "xgboost_model.pkl"), "rb") as f:
         xgb_model = pickle.load(f)
+
+    metadata_df = metadata_df.rename(columns={"asin": "item_id"}) if metadata_df is not None else None
+
+    if 'price' in metadata_df.columns:
+        # Remove currency symbols, then convert to a numeric type.
+        # 'coerce' will turn any errors (like text) into NaN (Not a Number).
+        metadata_df['price'] = metadata_df['price'].astype(str).str.replace(r'[$,]', '', regex=True)
+        metadata_df['price'] = pd.to_numeric(metadata_df['price'], errors='coerce')
 
     # ---------------------- #
     # 4. UI Setup
@@ -166,6 +177,10 @@ def main():
                     "ncf_score": "NCF",
                 }
             )
+
+            if metadata_df is not None:
+                user_recs = pd.merge(user_recs, metadata_df, on="item_id", how="left")
+
             st.write(ncf_predictions_df.head())
             if True:
                 
@@ -209,7 +224,34 @@ def main():
                         st.subheader(f"Top 5 Recommendations for User {user_id}")
                         st.markdown(f" **Min: {user_recs[model_choice].min():.5f}, Max: {user_recs[model_choice].max():.5f}**")
                         for _, row in top_recs.iterrows():
-                            st.markdown(f"**Product ID: {row['item_id']}**")
+                            # --- Get all the metadata with corrected column names ---
+                            product_title = row.get('title', f"Product ID: {row['item_id']}")
+                            image_url = row.get('imageURLHighRes') # Use the correct image column
+                            price = row.get('price')
+                            category = row.get('main_cat', 'No Category') # Use the correct category column
+
+                            
+                            if image_url and isinstance(image_url, str) and image_url.startswith('['):
+                                try:
+                                    # Convert the string "['url1']" into a real list ['url1']
+                                    url_list = ast.literal_eval(image_url)
+                                    # Get the first URL from the list
+                                    image_url = url_list[0] if url_list else None
+                                except:
+                                    # If parsing fails, treat as no image
+                                    image_url = None
+                            
+                            # --- Display the metadata ---
+                            st.markdown(f"##### {product_title}")
+
+                            if image_url and isinstance(image_url, str) and image_url.strip():
+                                st.image(image_url, width=400)
+
+                            if price and pd.notna(price):
+                                st.markdown(f"**Price:** ${price:.2f} | **Category:** {category}")
+                            else:
+                                st.markdown(f"**Price:** No price available | **Category:** {category}")
+                            
                             # st.write(f"🐹 Selected {model_choice} Score: {row.get(model_choice, 0):.5f}")
                             st.write(f"📊 Hybrid Score: {row.get('Hybrid', 0):.5f}")
                             st.write(f"⭐ SVD: {row.get('SVD', 0):.5f}")
