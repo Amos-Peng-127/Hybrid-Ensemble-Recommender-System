@@ -71,7 +71,7 @@ def main():
     warnings.filterwarnings("ignore", category=UserWarning, module="xgboost")
 
     st.markdown("<h1 style='font-size: 40px;'>📚 Amazon Product Recommender</h1>", unsafe_allow_html=True)
-    st.markdown("Choose a user or product to get recommendations. This app uses the final hybrid model outputs.")
+    st.markdown("Choose a user ID to get recommendations for this user ID. You can filter recommendations by minimum rating and category.")
 
     # ---------------------- #
     # 2. File Download & Check
@@ -153,7 +153,7 @@ def main():
     # 4. UI Setup
     # ---------------------- #
     st.sidebar.header("🔎 Filter Options")
-    min_rating = st.sidebar.slider("Minimum Rating", 0.0, 5.0, 3.5)
+    min_rating = st.sidebar.slider("Minimum Rating", 0.0, 5.0, 0.5)
     category_options = df["category"].dropna().unique() if "category" in df.columns else []
     selected_category = (
         st.sidebar.selectbox("Category", ["All"] + sorted(category_options.tolist())) # type: ignore
@@ -188,10 +188,16 @@ def main():
     # 5. Generate Recommendations
     # ---------------------- #
     if st.button("Get Recommendations"):
-        
+        placeholder = st.empty()
         try:
+            
+            # Display meme image in placeholder
+            with placeholder:
+                st.image(
+                    "https://media.licdn.com/dms/image/v2/C5612AQFtBw-tXa5Saw/article-cover_image-shrink_720_1280/article-cover_image-shrink_720_1280/0/1554742888227?e=1760572800&v=beta&t=7UtXE9QnqhmDURtPJ3zYAfC62op2HLyuBVaP7SDD0yc",
+                    width=300
+                )  # A relevant, fun meme
             with st.spinner('🤖 Calculating your personalized recommendations...'):
-                st.image("https://media.licdn.com/dms/image/v2/C5612AQFtBw-tXa5Saw/article-cover_image-shrink_720_1280/article-cover_image-shrink_720_1280/0/1554742888227?e=1760572800&v=beta&t=7UtXE9QnqhmDURtPJ3zYAfC62op2HLyuBVaP7SDD0yc", width=300) # A relevant, fun meme
 
                 # The results will replace the spinner once the code inside is finished.
                 # --- SVD Predictions ---
@@ -242,7 +248,6 @@ def main():
                 if metadata_df is not None:
                     user_recs = pd.merge(user_recs, metadata_df, on="item_id", how="left")
                 
-                # st.write(ncf_predictions_df.head())
                 if True:
                     
                     def scale_to_0_5(series):
@@ -275,6 +280,8 @@ def main():
                 
                     user_recs['Hybrid'] = user_recs['Hybrid']
                     
+                    placeholder.empty()
+
                     # --- Filter Recommendations by Minimum Rating ---
                     if model_choice in user_recs.columns:
                         user_recs = user_recs[user_recs[model_choice] >= min_rating]
@@ -289,26 +296,39 @@ def main():
                             for _, row in top_recs.iterrows():
                                 # --- Get all the metadata with corrected column names ---
                                 product_title = row.get('title', f"Product ID: {row['item_id']}")
-                                image_url = row.get('imageURLHighRes') # Use the correct image column
+                                image_urls = row.get('imageURLHighRes') # Use the correct image column
                                 price = row.get('price')
                                 category = row.get('main_cat', 'No Category') # Use the correct category column
                                 
-                                if image_url and isinstance(image_url, str) and image_url.startswith('['):
+                                url_lists = []
+                                if image_urls and isinstance(image_urls, str) and image_urls.startswith('['):
                                     try:
                                         # Convert the string "['url1']" into a real list ['url1']
-                                        url_list = ast.literal_eval(image_url)
+                                        url_lists = ast.literal_eval(image_urls)
                                         # Get the first URL from the list
-                                        image_url = url_list[0] if url_list else None
+                                        image_urls = url_lists[0] if url_lists else None
                                     except:
                                         # If parsing fails, treat as no image
-                                        image_url = None
+                                        image_urls = None
+                                        url_lists = []
                                 
                                 # --- Display the metadata ---
                                 st.markdown(f"##### {product_title}")
 
-                                if image_url and isinstance(image_url, str) and image_url.strip():
-                                    st.image(image_url, width=400)
+                                img_rows = (len(url_lists) + 4) // 5
+                                for r in range(img_rows):
+                                    # Create 5 columns
+                                    cols = st.columns(5)
 
+                                    # Get image indices for current row
+                                    start = r * 5
+                                    end = min(start + 5, len(url_lists))  # Ensure end does not exceed length of url_lists
+                                    for i, img in enumerate(url_lists[start:end]):
+                                        with cols[i]:
+                                            st.image(img, width=100)
+                                else:
+                                    st.text("No image available")
+                                    
                                 if price and pd.notna(price):
                                     st.markdown(f"**Price:** ${price:.2f} | **Category:** {category}")
                                 else:
@@ -334,6 +354,7 @@ def main():
                             st.pyplot(plt)
 
         except Exception as e:
+            placeholder.empty()
             import traceback
             st.error(f"❌ Error: {e}")
             st.code(traceback.format_exc())
