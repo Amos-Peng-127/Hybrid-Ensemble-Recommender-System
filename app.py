@@ -70,7 +70,7 @@ def main():
     sys.path.append(BASE_DIR)
     warnings.filterwarnings("ignore", category=UserWarning, module="xgboost")
 
-    st.markdown("<h1 style='font-size: 40px;'>📚 Amazon Product Recommender</h1>", unsafe_allow_html=True)
+    st.title("📚 Amazon Product Recommender")
     st.markdown("Choose a user ID to get recommendations for this user ID. You can filter recommendations by minimum rating and category.")
 
     # ---------------------- #
@@ -152,6 +152,14 @@ def main():
     # ---------------------- #
     # 4. UI Setup
     # ---------------------- #
+
+    st.success("✅ The app is running! Choose your options below to get recommendations.")
+    st.image(
+        "https://arturlunardi.com/wp-content/uploads/2021/07/charge-for-recommender-systems.jpg", # A fun "It's alive!" meme
+        caption="Ready for recommendations!",
+        width=400
+    )
+
     st.sidebar.header("🔎 Filter Options")
     min_rating = st.sidebar.slider("Minimum Rating", 0.0, 5.0, 0.5)
     category_options = df["category"].dropna().unique() if "category" in df.columns else []
@@ -170,20 +178,19 @@ def main():
     model_choice = st.selectbox("Choose Model", ["Hybrid", "SVD", "BERT", "Sentiment", "XGBoost", "NCF"])
 
     with st.expander("Calculation Strategy Explanation"):
-                st.write('''
-                The hybrid recommendation system combines multiple models to generate a comprehensive score for each product. Here's how each component contributes:
+        st.write('''
+        The hybrid recommendation system combines multiple models to generate a comprehensive score for each product. Here's how each component contributes:
 
-                - **SVD**: The SVD model provides a basic recommendation based on user-item interactions and their ratings.
-                - **BERT**: The BERT model captures semantic similarity between products based on their text content.
-                - **Sentiment**: Sentiment analysis is used to filter out negatively reviewed products.
-                - **XGBoost**: The XGBoost model is used to fine-tune the final recommendation score.
-                - **NCF**: The Neural Collaborative Filtering (NCF) model is a deep learning approach to generate personalized recommendations.
-                ''')
-            
-                st.latex(r'''
-                    Hybrid = 0.3 \times XGBoost_{scaled} + 0.25 \times NCF_{scaled} + 0.15 \times BERT_{scaled} + 0.15 \times SVD_{scaled} + 0.15 \times Sentiment_{scaled}
-                    ''')
-            
+        - **SVD**: The SVD model provides a basic recommendation based on user-item interactions and their ratings.
+        - **BERT**: The BERT model captures semantic similarity between products based on their text content.
+        - **Sentiment**: Sentiment analysis is used to filter out negatively reviewed products.
+        - **XGBoost**: The XGBoost model is used to fine-tune the final recommendation score.
+        - **NCF**: The Neural Collaborative Filtering (NCF) model is a deep learning approach to generate personalized recommendations.
+        ''')
+    
+        st.latex(r'''
+            Hybrid = 0.3 \times XGBoost_{scaled} + 0.25 \times NCF_{scaled} + 0.15 \times BERT_{scaled} + 0.15 \times SVD_{scaled} + 0.15 \times Sentiment_{scaled}
+            ''')
     # ---------------------- #
     # 5. Generate Recommendations
     # ---------------------- #
