@@ -1,14 +1,52 @@
-import streamlit as st
+import streamlit as st # type: ignore
+from streamlit_extras.badges import badge # type: ignore
 st.set_page_config(page_title="Amazon Recommender", page_icon="📚")
 
 def main():
-    st.title("My Streamlit App")
+    # st.title("My Streamlit App")
+    
+    st.markdown(
+        """
+        <style>
+            * {
+                font-family: cursive;
+                color: #000000;
+                font-size: 16px;
+            }
+            .stApp {
+                background-color: #ADD8E6; /* Light blue background */
+            }
+            .stSidebar {
+                background-color: white; /* Lighter blue for sidebar */
+            }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+   
+    st.markdown(
+        """
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <a href="https://github.com/TINYRAINYLIN" target="_blank" style="text-decoration: none;">
+                <span style="background-color: #E4CFD3; color: black; padding: 5px 10px; border-radius: 5px; font-size: 14px; display: inline-block;">
+                💧 Rain Lin
+                </span>
+            </a>
+            <a href="https://github.com/Amos-Peng-127" target="_blank" style="text-decoration: none;">
+                <span style="background-color: #007bff; color: white; padding: 5px 10px; border-radius: 5px; font-size: 14px; display: inline-block;">
+                🐉 Zhixiang Peng
+                </span>
+            </a>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     
     import os, sys, pickle, warnings
     import pandas as pd
     import numpy as np
     import matplotlib.pyplot as plt
-    import gdown
+    import gdown # type: ignore
     import ast
 
     import sys, os
@@ -105,11 +143,11 @@ def main():
 
     metadata_df = metadata_df.rename(columns={"asin": "item_id"}) if metadata_df is not None else None
 
-    if 'price' in metadata_df.columns:
+    if 'price' in metadata_df.columns: # type: ignore
         # Remove currency symbols, then convert to a numeric type.
         # 'coerce' will turn any errors (like text) into NaN (Not a Number).
-        metadata_df['price'] = metadata_df['price'].astype(str).str.replace(r'[$,]', '', regex=True)
-        metadata_df['price'] = pd.to_numeric(metadata_df['price'], errors='coerce')
+        metadata_df['price'] = metadata_df['price'].astype(str).str.replace(r'[$,]', '', regex=True) # type: ignore
+        metadata_df['price'] = pd.to_numeric(metadata_df['price'], errors='coerce') # type: ignore
 
     # ---------------------- #
     # 4. UI Setup
@@ -118,158 +156,182 @@ def main():
     min_rating = st.sidebar.slider("Minimum Rating", 0.0, 5.0, 3.5)
     category_options = df["category"].dropna().unique() if "category" in df.columns else []
     selected_category = (
-        st.sidebar.selectbox("Category", ["All"] + sorted(category_options.tolist()))
+        st.sidebar.selectbox("Category", ["All"] + sorted(category_options.tolist())) # type: ignore
         if len(category_options) > 0
         else "All"
     )
 
-    user_id = st.text_input("Enter User ID: (For example, 'AAP7PPBU72QFM')")
+    # user_id = st.text_input("Enter User ID: (For example, 'AAP7PPBU72QFM')")
+    user_id = st.selectbox(
+        "Choose from 10 Random User ID",
+        df.sample(10)["user_id"].unique().tolist(),
+    )
+
     model_choice = st.selectbox("Choose Model", ["Hybrid", "SVD", "BERT", "Sentiment", "XGBoost", "NCF"])
 
+    with st.expander("Calculation Strategy Explanation"):
+                st.write('''
+                The hybrid recommendation system combines multiple models to generate a comprehensive score for each product. Here's how each component contributes:
+
+                - **SVD**: The SVD model provides a basic recommendation based on user-item interactions and their ratings.
+                - **BERT**: The BERT model captures semantic similarity between products based on their text content.
+                - **Sentiment**: Sentiment analysis is used to filter out negatively reviewed products.
+                - **XGBoost**: The XGBoost model is used to fine-tune the final recommendation score.
+                - **NCF**: The Neural Collaborative Filtering (NCF) model is a deep learning approach to generate personalized recommendations.
+                ''')
+            
+                st.latex(r'''
+                    Hybrid = 0.3 \times XGBoost_{scaled} + 0.25 \times NCF_{scaled} + 0.15 \times BERT_{scaled} + 0.15 \times SVD_{scaled} + 0.15 \times Sentiment_{scaled}
+                    ''')
+            
     # ---------------------- #
     # 5. Generate Recommendations
     # ---------------------- #
     if st.button("Get Recommendations"):
         
         try:
-            
-            # --- SVD Predictions ---
-            svd_recommended_items_df = get_svd_predictions_for_user_history(user_id, df, df, svd_model_path, n=10)
+            with st.spinner('🤖 Calculating your personalized recommendations...'):
+                st.image("https://media.licdn.com/dms/image/v2/C5612AQFtBw-tXa5Saw/article-cover_image-shrink_720_1280/article-cover_image-shrink_720_1280/0/1554742888227?e=1760572800&v=beta&t=7UtXE9QnqhmDURtPJ3zYAfC62op2HLyuBVaP7SDD0yc", width=300) # A relevant, fun meme
 
-            # --- Sentiment Analysis ---
-            sentiment_df = calculate_sentiment_for_items(df, svd_recommended_items_df)
+                # The results will replace the spinner once the code inside is finished.
+                # --- SVD Predictions ---
+                svd_recommended_items_df = get_svd_predictions_for_user_history(user_id, df, df, svd_model_path, n=10)
 
-            # --- BERT Similarity ---
-            bert_similarity_df = calculate_bert_content_similarity(
-                df, sentiment_df, user_id, bert_vectors, bert_item_id_to_idx
-            )
-            # st.write(bert_similarity_df.head())
+                # --- Sentiment Analysis ---
+                sentiment_df = calculate_sentiment_for_items(df, svd_recommended_items_df)
 
-            # --- User Average Ratings ---
-            user_avg_rating = df[df["user_id"] == user_id]["overall"].mean()
-            bert_similarity_df["user_ave_rating"] = user_avg_rating
+                # --- BERT Similarity ---
+                bert_similarity_df = calculate_bert_content_similarity(
+                    df, sentiment_df, user_id, bert_vectors, bert_item_id_to_idx
+                )
+                # st.write(bert_similarity_df.head())
 
-            # --- Item Average Ratings ---
-            item_avg_ratings = []
-            for item_id in bert_similarity_df["item_id"].tolist():
-                item_avg_ratings.append(df[df["item_id"] == item_id]["overall"].mean())
-            
-            bert_similarity_df["product_ave_rating"] = item_avg_ratings
-            
-            # --- XGBoost Predictions ---
-            xgb_predictions_df = calculate_xgboost(bert_similarity_df, xgb_model)
-            
-            # --- NCF Predictions ---
-            ncf_predictions_df = get_ncf_predictions(
-                xgb_predictions_df,
-                os.path.join(download_dir, "ncf_model.pt"),
-                os.path.join(download_dir, "user_item_mappings.pkl"),
-                embedding_dim=64,
-            )
-            
-            # --- Rename Columns for Display ---
-            user_recs = ncf_predictions_df.rename(
-                columns={
-                    "svd_rating": "SVD",
-                    "bert_similarity": "BERT",
-                    "sentiment_score": "Sentiment",
-                    "xgb_pred_score": "XGBoost",
-                    "ncf_score": "NCF",
-                }
-            )
+                # --- User Average Ratings ---
+                user_avg_rating = df[df["user_id"] == user_id]["overall"].mean()
+                bert_similarity_df["user_ave_rating"] = user_avg_rating
 
-            if metadata_df is not None:
-                user_recs = pd.merge(user_recs, metadata_df, on="item_id", how="left")
-
-            st.write(ncf_predictions_df.head())
-            if True:
+                # --- Item Average Ratings ---
+                item_avg_ratings = []
+                for item_id in bert_similarity_df["item_id"].tolist():
+                    item_avg_ratings.append(df[df["item_id"] == item_id]["overall"].mean())
                 
-                def scale_to_0_5(series):
-                    # z-score
-                    mean_val, std_val = series.mean(), series.std()
-                    if std_val == 0:
-                        standardized = series - mean_val
-                    else:
-                        standardized = (series - mean_val) / std_val
-                    
-                    # scale 0-5
-                    if standardized.max() > standardized.min():
-                        return 5 * (standardized - standardized.min()) / (standardized.max() - standardized.min())
-                    else:
-                        return 2.5
-                    
-                user_recs['XGBoost_scaled'] = scale_to_0_5(user_recs['XGBoost'])
-                user_recs['NCF_scaled'] = scale_to_0_5(user_recs['NCF'])
-                user_recs['BERT_scaled'] = scale_to_0_5(user_recs['BERT'])
-                user_recs['SVD_scaled'] = scale_to_0_5(user_recs['SVD'])
-                user_recs['Sentiment_scaled'] = scale_to_0_5(user_recs['Sentiment'])
-
-                user_recs['Hybrid'] = (
-                    0.3 * user_recs['XGBoost_scaled'] +
-                    0.25 * user_recs['NCF_scaled'] +
-                    0.15 * user_recs['BERT_scaled'] +
-                    0.15 * user_recs['SVD_scaled'] +
-                    0.15 * user_recs['Sentiment_scaled']
+                bert_similarity_df["product_ave_rating"] = item_avg_ratings
+                
+                # --- XGBoost Predictions ---
+                xgb_predictions_df = calculate_xgboost(bert_similarity_df, xgb_model)
+                
+                # --- NCF Predictions ---
+                ncf_predictions_df = get_ncf_predictions(
+                    xgb_predictions_df,
+                    os.path.join(download_dir, "ncf_model.pt"),
+                    os.path.join(download_dir, "user_item_mappings.pkl"),
+                    embedding_dim=64,
+                )
+                
+                # --- Rename Columns for Display ---
+                user_recs = ncf_predictions_df.rename(
+                    columns={
+                        "svd_rating": "SVD",
+                        "bert_similarity": "BERT",
+                        "sentiment_score": "Sentiment",
+                        "xgb_pred_score": "XGBoost",
+                        "ncf_score": "NCF",
+                    }
                 )
 
-                user_recs['Hybrid'] = user_recs['Hybrid']
+                if metadata_df is not None:
+                    user_recs = pd.merge(user_recs, metadata_df, on="item_id", how="left")
                 
-                # --- Filter Recommendations by Minimum Rating ---
-                if model_choice in user_recs.columns:
-                    user_recs = user_recs[user_recs[model_choice] >= min_rating]
-                    top_recs = user_recs.sort_values(model_choice, ascending=False).head(5)
-                    if len(user_recs[model_choice]) == 0:
-                        st.write(f"No recommendations found with {model_choice} scores ≥ {min_rating}. Try lowering the minimum rating.")
-                    else:    
-                        st.subheader(f"Top 5 Recommendations for User {user_id}")
-                        st.markdown(f" **Min: {user_recs[model_choice].min():.5f}, Max: {user_recs[model_choice].max():.5f}**")
-                        for _, row in top_recs.iterrows():
-                            # --- Get all the metadata with corrected column names ---
-                            product_title = row.get('title', f"Product ID: {row['item_id']}")
-                            image_url = row.get('imageURLHighRes') # Use the correct image column
-                            price = row.get('price')
-                            category = row.get('main_cat', 'No Category') # Use the correct category column
+                # st.write(ncf_predictions_df.head())
+                if True:
+                    
+                    def scale_to_0_5(series):
+                        # z-score
+                        mean_val, std_val = series.mean(), series.std()
+                        if std_val == 0:
+                            standardized = series - mean_val
+                        else:
+                            standardized = (series - mean_val) / std_val
+                        
+                        # scale 0-5
+                        if standardized.max() > standardized.min():
+                            return 5 * (standardized - standardized.min()) / (standardized.max() - standardized.min())
+                        else:
+                            return 2.5
+                        
+                    user_recs['XGBoost_scaled'] = scale_to_0_5(user_recs['XGBoost'])
+                    user_recs['NCF_scaled'] = scale_to_0_5(user_recs['NCF'])
+                    user_recs['BERT_scaled'] = scale_to_0_5(user_recs['BERT'])
+                    user_recs['SVD_scaled'] = scale_to_0_5(user_recs['SVD'])
+                    user_recs['Sentiment_scaled'] = scale_to_0_5(user_recs['Sentiment'])
 
-                            
-                            if image_url and isinstance(image_url, str) and image_url.startswith('['):
-                                try:
-                                    # Convert the string "['url1']" into a real list ['url1']
-                                    url_list = ast.literal_eval(image_url)
-                                    # Get the first URL from the list
-                                    image_url = url_list[0] if url_list else None
-                                except:
-                                    # If parsing fails, treat as no image
-                                    image_url = None
-                            
-                            # --- Display the metadata ---
-                            st.markdown(f"##### {product_title}")
+                    user_recs['Hybrid'] = (
+                        0.3 * user_recs['XGBoost_scaled'] +
+                        0.25 * user_recs['NCF_scaled'] +
+                        0.15 * user_recs['BERT_scaled'] +
+                        0.15 * user_recs['SVD_scaled'] +
+                        0.15 * user_recs['Sentiment_scaled']
+                    )
+                
+                    user_recs['Hybrid'] = user_recs['Hybrid']
+                    
+                    # --- Filter Recommendations by Minimum Rating ---
+                    if model_choice in user_recs.columns:
+                        user_recs = user_recs[user_recs[model_choice] >= min_rating]
+                        top_recs = user_recs.sort_values(model_choice, ascending=False).head(5)
+                        top_recs.drop_duplicates(keep='first', inplace=True)
+                        
+                        if len(user_recs[model_choice]) == 0:
+                            st.write(f"No recommendations found with {model_choice} scores ≥ {min_rating}. Try lowering the minimum rating.")
+                        else:    
+                            st.subheader(f"Top {len(top_recs)} Recommendations for User ID:{user_id}")
+                            st.markdown(f" **Min: {user_recs[model_choice].min():.5f}, Max: {user_recs[model_choice].max():.5f}**")
+                            for _, row in top_recs.iterrows():
+                                # --- Get all the metadata with corrected column names ---
+                                product_title = row.get('title', f"Product ID: {row['item_id']}")
+                                image_url = row.get('imageURLHighRes') # Use the correct image column
+                                price = row.get('price')
+                                category = row.get('main_cat', 'No Category') # Use the correct category column
+                                
+                                if image_url and isinstance(image_url, str) and image_url.startswith('['):
+                                    try:
+                                        # Convert the string "['url1']" into a real list ['url1']
+                                        url_list = ast.literal_eval(image_url)
+                                        # Get the first URL from the list
+                                        image_url = url_list[0] if url_list else None
+                                    except:
+                                        # If parsing fails, treat as no image
+                                        image_url = None
+                                
+                                # --- Display the metadata ---
+                                st.markdown(f"##### {product_title}")
 
-                            if image_url and isinstance(image_url, str) and image_url.strip():
-                                st.image(image_url, width=400)
+                                if image_url and isinstance(image_url, str) and image_url.strip():
+                                    st.image(image_url, width=400)
 
-                            if price and pd.notna(price):
-                                st.markdown(f"**Price:** ${price:.2f} | **Category:** {category}")
-                            else:
-                                st.markdown(f"**Price:** No price available | **Category:** {category}")
-                            
-                            # st.write(f"🐹 Selected {model_choice} Score: {row.get(model_choice, 0):.5f}")
-                            st.write(f"📊 Hybrid Score: {row.get('Hybrid', 0):.5f}")
-                            st.write(f"⭐ SVD: {row.get('SVD', 0):.5f}")
-                            st.write(f"💬 Sentiment: {row.get('Sentiment', 0):.5f}")
-                            st.write(f"👅 BERT: {row.get('BERT', 0):.5f}")
-                            st.write(f"🌲 XGBoost: {row.get('XGBoost', 0):.5f}")
-                            st.write(f"🧠 NCF: {row.get('NCF', 0):.5f}")
-                            
-                            st.write("---")
+                                if price and pd.notna(price):
+                                    st.markdown(f"**Price:** ${price:.2f} | **Category:** {category}")
+                                else:
+                                    st.markdown(f"**Price:** No price available | **Category:** {category}")
+                                
+                                # st.write(f"🐹 Selected {model_choice} Score: {row.get(model_choice, 0):.5f}")
+                                st.write(f"📊 Hybrid Score: {row.get('Hybrid', 0):.5f}")
+                                st.write(f"⭐ SVD: {row.get('SVD', 0):.5f}")
+                                st.write(f"💬 Sentiment: {row.get('Sentiment', 0):.5f}")
+                                st.write(f"👅 BERT: {row.get('BERT', 0):.5f}")
+                                st.write(f"🌲 XGBoost: {row.get('XGBoost', 0):.5f}")
+                                st.write(f"🧠 NCF: {row.get('NCF', 0):.5f}")
+                                
+                                st.write("---")
 
-                        # 🔍 Visualization
-                        st.subheader("Score Comparison")
-                        plt.figure(figsize=(10, 4))
-                        plt.bar(top_recs['item_id'], top_recs[model_choice], color='skyblue')
-                        plt.title(f"{model_choice} Scores for Top 5 Products")
-                        plt.xlabel("Product ID")
-                        plt.ylabel("Score")
-                        st.pyplot(plt)
+                            # 🔍 Visualization
+                            st.subheader("Score Comparison")
+                            plt.figure(figsize=(10, 4))
+                            plt.bar(top_recs['item_id'], top_recs[model_choice], color='skyblue')
+                            plt.title(f"{model_choice} Scores for Top 5 Products")
+                            plt.xlabel("Product ID")
+                            plt.ylabel("Score")
+                            st.pyplot(plt)
 
         except Exception as e:
             import traceback
