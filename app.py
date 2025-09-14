@@ -1,5 +1,5 @@
 import streamlit as st # type: ignore
-from streamlit_extras.badges import badge # type: ignore
+# from streamlit_extras.badges import badge # type: ignore
 st.set_page_config(page_title="Amazon Recommender", page_icon="📚")
 
 def main():
@@ -73,6 +73,21 @@ def main():
     st.title("📚 Amazon Product Recommender")
     st.markdown("Choose a user ID to get recommendations for this user ID. You can filter recommendations by minimum rating and category.")
 
+    initial_content_placeholder = st.empty()
+    with initial_content_placeholder.container():
+        st.success("Are you ready for recommendations? 3...2...1... 🚀 Let's go!")
+        st.image(
+            "https://arturlunardi.com/wp-content/uploads/2021/07/charge-for-recommender-systems.jpg", # A fun "It's alive!" meme
+            caption="✅ The app is running... Choose your options below to get recommendations.",
+            width=400
+        )
+
+    # import time
+    # time.sleep(10)  # Display for 5 seconds
+
+    
+
+    
     # ---------------------- #
     # 2. File Download & Check
     # ---------------------- #
@@ -124,6 +139,7 @@ def main():
         return TARGET_DIR
 
     download_dir = ensure_all_files()
+    
 
     # ---------------------- #
     # 3. Load Data and Models
@@ -153,13 +169,6 @@ def main():
     # 4. UI Setup
     # ---------------------- #
 
-    st.success("✅ The app is running! Choose your options below to get recommendations.")
-    st.image(
-        "https://arturlunardi.com/wp-content/uploads/2021/07/charge-for-recommender-systems.jpg", # A fun "It's alive!" meme
-        caption="Ready for recommendations!",
-        width=400
-    )
-
     st.sidebar.header("🔎 Filter Options")
     min_rating = st.sidebar.slider("Minimum Rating", 0.0, 5.0, 0.5)
     category_options = df["category"].dropna().unique() if "category" in df.columns else []
@@ -174,8 +183,11 @@ def main():
         "Choose from 10 Random User ID",
         df.sample(10)["user_id"].unique().tolist(),
     )
+    
 
     model_choice = st.selectbox("Choose Model", ["Hybrid", "SVD", "BERT", "Sentiment", "XGBoost", "NCF"])
+
+    initial_content_placeholder.empty()
 
     with st.expander("Calculation Strategy Explanation"):
         st.write('''
@@ -202,7 +214,7 @@ def main():
             with placeholder:
                 st.image(
                     "https://media.licdn.com/dms/image/v2/C5612AQFtBw-tXa5Saw/article-cover_image-shrink_720_1280/article-cover_image-shrink_720_1280/0/1554742888227?e=1760572800&v=beta&t=7UtXE9QnqhmDURtPJ3zYAfC62op2HLyuBVaP7SDD0yc",
-                    width=300
+                    width=500
                 )  # A relevant, fun meme
             with st.spinner('🤖 Calculating your personalized recommendations...'):
 
@@ -289,11 +301,14 @@ def main():
                     
                     placeholder.empty()
 
+                    
+
                     # --- Filter Recommendations by Minimum Rating ---
                     if model_choice in user_recs.columns:
                         user_recs = user_recs[user_recs[model_choice] >= min_rating]
                         top_recs = user_recs.sort_values(model_choice, ascending=False).head(5)
                         top_recs.drop_duplicates(keep='first', inplace=True)
+                        # st.write(top_recs.head())
                         
                         if len(user_recs[model_choice]) == 0:
                             st.write(f"No recommendations found with {model_choice} scores ≥ {min_rating}. Try lowering the minimum rating.")
@@ -306,6 +321,7 @@ def main():
                                 image_urls = row.get('imageURLHighRes') # Use the correct image column
                                 price = row.get('price')
                                 category = row.get('main_cat', 'No Category') # Use the correct category column
+                                item_id2 = row.get('item_id', 'N/A')
                                 
                                 url_lists = []
                                 if image_urls and isinstance(image_urls, str) and image_urls.startswith('['):
@@ -319,27 +335,27 @@ def main():
                                         image_urls = None
                                         url_lists = []
                                 
-                                # --- Display the metadata ---
-                                st.markdown(f"##### {product_title}")
+                                    # --- Display the metadata ---
+                                    st.markdown(f"##### {product_title}")
 
-                                img_rows = (len(url_lists) + 4) // 5
-                                for r in range(img_rows):
-                                    # Create 5 columns
-                                    cols = st.columns(5)
+                                    img_rows = (len(url_lists) + 4) // 5
+                                    for r in range(img_rows):
+                                        # Create 5 columns
+                                        cols = st.columns(5)
 
-                                    # Get image indices for current row
-                                    start = r * 5
-                                    end = min(start + 5, len(url_lists))  # Ensure end does not exceed length of url_lists
-                                    for i, img in enumerate(url_lists[start:end]):
-                                        with cols[i]:
-                                            st.image(img, width=100)
+                                        # Get image indices for current row
+                                        start = r * 5
+                                        end = min(start + 5, len(url_lists))  # Ensure end does not exceed length of url_lists
+                                        for i, img in enumerate(url_lists[start:end]):
+                                            with cols[i]:
+                                                st.image(img, width=100)
                                 else:
                                     st.text("No image available")
                                     
                                 if price and pd.notna(price):
-                                    st.markdown(f"**Price:** ${price:.2f} | **Category:** {category}")
+                                    st.markdown(f"**Price:** ${price:.2f} | **Category:** {category} | **Product ID**: {item_id2}")
                                 else:
-                                    st.markdown(f"**Price:** No price available | **Category:** {category}")
+                                    st.markdown(f"**Price:** No price available | **Category:** {category} | **Product ID:** {item_id2}")
                                 
                                 # st.write(f"🐹 Selected {model_choice} Score: {row.get(model_choice, 0):.5f}")
                                 st.write(f"📊 Hybrid Score: {row.get('Hybrid', 0):.5f}")
